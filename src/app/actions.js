@@ -103,13 +103,15 @@ export async function whenWillItBeFree(courses) {
     let nextFreeTime = null;
     
     // Conversion et tri optimisés
-    const sortedCourses = courses
-        .map(course => ({
+    const coursesWithTimes = await Promise.all(
+        courses.map(async course => ({
             ...course,
-            startTime: toDate(course.dtstart),
-            endTime: toDate(course.dtend)
+            startTime: await toDate(course.dtstart),
+            endTime: await toDate(course.dtend)
         }))
-        .sort((a, b) => a.startTime - b.startTime);
+    );
+    
+    const sortedCourses = coursesWithTimes.sort((a, b) => a.startTime - b.startTime);
     
     for (const course of sortedCourses) {
         if (course.endTime > now && (!nextFreeTime || course.endTime < nextFreeTime)) {
@@ -247,7 +249,7 @@ export async function getFreeRooms(queryDate, queryHeure, univ) {
             
             try {
                 const courses = await getClassCourses(room.room_url, date);
-                const classStatus = isClassFree(courses, date);
+                const classStatus = await isClassFree(courses, date);
                 
                 if (classStatus.free) {
                     return { 
@@ -256,7 +258,7 @@ export async function getFreeRooms(queryDate, queryHeure, univ) {
                         data: classStatus 
                     };
                 } else {
-                    const willBeFree = whenWillItBeFree(classStatus.courses);
+                    const willBeFree = await whenWillItBeFree(classStatus.courses);
                     return { 
                         room: room.room_name, 
                         status: 'used', 
