@@ -157,7 +157,7 @@ async function getFreeRooms(queryDate, queryHeure, univ) {
                 freeRooms[room.room_name] = classStatus;
             } else {
                 usedRooms[room.room_name] = classStatus;
-                usedRooms[room.room_name].willBeFree = whenWillItBeFree(usedRooms[room.room_name].courses);
+                usedRooms[room.room_name].willBeFree = whenWillItBeFree(usedRooms[room.room_name].courses, date);
             }
         } catch (error) {
             // console.error('Error:', error.message);
@@ -169,23 +169,62 @@ async function getFreeRooms(queryDate, queryHeure, univ) {
     return { freeRooms, usedRooms, invalidRooms };
 }
 
-function whenWillItBeFree(courses) {
-    let willBeFree = null;
-    if( courses.length == 0) {
-        console.warn('Invalid usedCourse data:', course);
-        return;
+function whenWillItBeFree(courses, now) {
+    if (courses.length == 0) {
+        console.warn('Invalid usedCourse data:', courses);
+        return null;
     }
-    
-    for (const course of courses) {
-        if (!course || !course.dtstart || !course.dtend) {
-            console.warn('Invalid course data:', course);
+
+    // Filtrer et trier les cours par heure de début
+    const validCourses = courses
+        .filter(course => course && course.dtstart && course.dtend)
+        .map(course => ({
+            ...course,
+            start: toDate(course.dtstart),
+            end: toDate(course.dtend)
+        }))
+        .sort((a, b) => a.start - b.start);
+
+    if (validCourses.length == 0) {
+        return null;
+    }
+
+    // Trouver le cours actuel (celui qui contient now)
+    let currentCourse = null;
+    for (const course of validCourses) {
+        if (course.start <= now && course.end > now) {
+            currentCourse = course;
+            break;
+        }
+    }
+
+    if (!currentCourse) {
+        // Pas de cours actuel trouvé, renvoyer la fin du premier cours
+        return validCourses[0].end;
+    }
+
+    // À partir du cours actuel, chercher les cours consécutifs
+    let willBeFree = currentCourse.end;
+
+    // Parcourir les cours suivants pour voir s'ils sont consécutifs
+    for (const course of validCourses) {
+        // Ignorer les cours qui commencent avant ou pendant le cours actuel
+        if (course.start <= currentCourse.start) {
             continue;
         }
 
-        const courseStart = toDate(course.dtstart);
-        const courseEnd = toDate(course.dtend);
-        if(courseEnd == null || courseEnd > willBeFree) willBeFree = courseEnd;
+        // Vérifier si ce cours est consécutif (commence à la fin ou juste après)
+        // Tolérance de 1 minute pour les erreurs d'arrondi
+        const gap = course.start - willBeFree;
+        if (gap <= 60000) { // 60000ms = 1 minute de tolérance
+            // Cours consécutif, mettre à jour willBeFree
+            willBeFree = course.end;
+        } else {
+            // Il y a un trou, on arrête
+            break;
+        }
     }
+
     return willBeFree;
 }
 
