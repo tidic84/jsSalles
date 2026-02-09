@@ -1,0 +1,103 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement de déploiement'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: |
+          cat << EOF > .env
+          DB_USER=${{ secrets.DB_USER }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          EOF
+
+      - name: Build application
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        env:
+          SSH_USER: ${{ secrets.SSH_USERNAME }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          # Sync build output
+          rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key" \
+            .next/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/.next/"
+          
+          # Sync public assets
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            public/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/public/"
+          
+          # Sync package files
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            package.json "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+          
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            package-lock.json "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+          
+          # Sync env file
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            .env "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+          
+          # Sync node_modules (dépendances de production)
+          rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key" \
+            node_modules/ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/node_modules/"
+
+      - name: Restart application
+        env:
+          SSH_USER: ${{ secrets.SSH_USERNAME }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          APP_NAME: ${{ secrets.PM2_APP_NAME }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" '
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            cd "'"${DEPLOY_PATH}"'"
+            
+            # Redémarrer ou démarrer l'application avec PM2
+            pm2 delete "'"${APP_NAME}"'" 2>/dev/null || true
+            pm2 start npm --name "'"${APP_NAME}"'" -- start
+            pm2 save
+          '
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
