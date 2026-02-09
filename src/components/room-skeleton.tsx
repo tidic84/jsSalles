@@ -43,7 +43,7 @@ export function RoomSkeletonGrid() {
 
 export function RoomSkeletonTable() {
   return (
-    <div className="divide-y divide-border rounded-lg border bg-card">
+    <div className="divide-y divide-border rounded-xl border bg-card shadow-sm">
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}

@@ -53,7 +53,7 @@ export function RoomList({ rooms, onRoomClick }: RoomListProps) {
   }
 
   return (
-    <div className="divide-y divide-border rounded-lg border bg-card">
+    <div className="divide-y divide-border rounded-xl border bg-card shadow-sm">
       {rooms.map(([roomName, data]) => {
         const isFree = data.free;
 
@@ -80,7 +80,7 @@ export function RoomList({ rooms, onRoomClick }: RoomListProps) {
             key={roomName}
             type="button"
             onClick={() => onRoomClick(roomName)}
-            className="group flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-accent/50 first:rounded-t-lg last:rounded-b-lg"
+            className="group flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-accent/50 first:rounded-t-xl last:rounded-b-xl"
           >
             <div className="flex items-center gap-3">
               <span
