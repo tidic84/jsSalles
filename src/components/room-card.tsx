@@ -37,7 +37,7 @@ function formatTimeFromDate(d: Date) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: "UTC",
+    timeZone: "Europe/Paris",
   });
 }
 
@@ -62,7 +62,7 @@ export function RoomCard({ roomName, data, onClick }: RoomCardProps) {
     const usedData = data as UsedData;
     if (usedData.willBeFree) {
       const freeAt = new Date(usedData.willBeFree);
-      subtitle = `Libre a ${freeAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })}`;
+      subtitle = `Libre a ${freeAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Paris" })}`;
     } else {
       subtitle = "Horaire inconnu";
     }

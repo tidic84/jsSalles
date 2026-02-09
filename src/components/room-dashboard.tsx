@@ -137,7 +137,7 @@ export function RoomDashboard({ univ }: { univ: string }) {
       <div className="flex items-center gap-3">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2 bg-white hover:bg-gray-50">
               <CalendarClock className="h-4 w-4" />
               Selectionner Date/Heure
             </Button>
