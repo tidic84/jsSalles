@@ -1,36 +1,165 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎓 jsSalles
 
-## Getting Started
+Application web pour consulter la disponibilité des salles de l'Université d'Avignon en temps réel.
 
-First, run the development server:
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat&logo=postgresql)](https://www.postgresql.org/)
+
+## ✨ Fonctionnalités
+
+- 🔍 **Consultation des salles libres** - Visualisation en temps réel des salles disponibles par campus
+- 📅 **Planification horaire** - Sélection d'une date et heure spécifique pour planifier à l'avance
+- 📱 **Interface responsive** - Design adapté mobile et desktop avec shadcn/ui
+- 🔐 **Panneau d'administration** - Gestion des salles et statistiques de visites
+- 📊 **Statistiques** - Suivi des visites journalières
+- 🗺️ **Multi-campus** - Support de plusieurs sites (CERI, Agroscience, Avignon-Centre)
+
+## 🚀 Stack Technique
+
+- **Framework** : [Next.js 16](https://nextjs.org/) (App Router)
+- **Langage** : [TypeScript](https://www.typescriptlang.org/)
+- **Base de données** : [PostgreSQL](https://www.postgresql.org/)
+- **UI** : [shadcn/ui](https://ui.shadcn.com/) + [Tailwind CSS 4](https://tailwindcss.com/)
+- **Authentification** : [iron-session](https://github.com/vvo/iron-session)
+- **Charts** : [Recharts](https://recharts.org/)
+
+## 📦 Installation
+
+### Prérequis
+
+- Node.js 20+
+- PostgreSQL 15+
+- npm ou yarn
+
+### Étapes
+
+1. **Cloner le repository**
+
+```bash
+git clone https://github.com/votre-org/jssalles.git
+cd jssalles
+```
+
+2. **Installer les dépendances**
+
+```bash
+npm install
+```
+
+3. **Configurer la base de données**
+
+```bash
+# Créer les tables
+psql -U $DB_USER -d $DB_NAME -f db/init.sql
+```
+
+4. **Configurer les variables d'environnement**
+
+Créer un fichier `.env` à la racine :
+
+```env
+# Base de données
+DB_USER=votre_utilisateur
+DB_HOST=localhost
+DB_NAME=jssalles
+DB_PASSWORD=votre_mot_de_passe
+DB_PORT=5432
+
+# Session (générer une clé sécurisée)
+SESSION_SECRET=votre_cle_secrete_de_32_caracteres_min
+```
+
+5. **Lancer le serveur de développement**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+L'application est accessible sur [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🏗️ Structure du projet
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+jssalles/
+├── src/
+│   ├── app/                 # Routes Next.js (App Router)
+│   │   ├── api/            # API Routes
+│   │   │   ├── auth/       # Authentification (login/logout)
+│   │   │   ├── admin/      # Endpoints admin (rooms, stats)
+│   │   │   └── rooms/      # API des salles libres
+│   │   ├── admin/          # Page admin
+│   │   ├── login/          # Page de connexion
+│   │   ├── univ/[univ]/    # Page des salles par université
+│   │   └── layout.tsx      # Layout principal
+│   ├── components/          # Composants React
+│   │   ├── ui/             # Composants shadcn/ui
+│   │   ├── room-list.tsx   # Liste des salles
+│   │   ├── room-dashboard.tsx
+│   │   └── navbar.tsx
+│   └── lib/                 # Utilitaires
+│       ├── db.ts           # Connexion PostgreSQL
+│       ├── queries.ts      # Requêtes SQL
+│       └── room-utils.ts   # Logique métier des salles
+├── db/                      # Scripts SQL
+│   ├── init.sql            # Schéma de la BDD
+│   └── sample_data.sql     # Données d'exemple
+└── public/                  # Assets statiques
+```
 
-## Learn More
+## 📝 Configuration des salles
 
-To learn more about Next.js, take a look at the following resources:
+Les salles sont configurées dans la table `rooms` avec leur URL de calendrier ICS (format iCalendar) :
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sql
+INSERT INTO rooms (univ, room_name, room_url) VALUES
+('ceri', 'Amphi Blaise', 'https://.../amphi_blaise.ics');
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Campuses supportés
 
-## Deploy on Vercel
+- `ceri` - CERI (Centre d'Enseignement et de Recherche en Informatique)
+- `agroscience` - Agroscience
+- `avignon-centre` - Avignon Centre
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🔐 Administration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Créer un compte administrateur
+
+1. Générer un hash du mot de passe via l'endpoint :
+
+```bash
+curl http://localhost:3000/api/admin/hash?password=votre_mot_de_passe
+```
+
+2. Insérer l'utilisateur en base :
+
+```sql
+INSERT INTO users (username, password) 
+VALUES ('admin', 'hash_généré');
+```
+
+### Fonctionnalités admin
+
+- Gestion des salles (ajout, modification, suppression)
+- Vérification des URLs de calendriers
+- Statistiques de visites journalières
+
+## 🚀 Déploiement
+
+### Build de production
+
+```bash
+npm run build
+npm start
+```
+
+## 📄 Licence
+
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+---
+
+<p align="center">
+  Développé avec ❤️ pour les étudiants de l'Université d'Avignon
+</p>
