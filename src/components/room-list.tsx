@@ -1,14 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 interface Course {
   dtstart: string;
@@ -61,54 +53,50 @@ export function RoomList({ rooms, onRoomClick }: RoomListProps) {
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-base">Salle</TableHead>
-            <TableHead className="text-base text-right">Prochain événement</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rooms.map(([roomName, data]) => {
-            const isFree = data.free;
+    <div className="divide-y divide-border rounded-lg border bg-card">
+      {rooms.map(([roomName, data]) => {
+        const isFree = data.free;
 
-            let statusText = "";
-            if (isFree) {
-              const freeData = data as FreeData;
-              if (freeData.nextCourse) {
-                statusText = `Libre jusqu'à ${formatTimeFromDate(toDate(freeData.nextCourse.dtstart))}`;
-              } else {
-                statusText = "Libre toute la journée";
-              }
-            } else {
-              const usedData = data as UsedData;
-              if (usedData.willBeFree) {
-                const freeAt = new Date(usedData.willBeFree);
-                statusText = `Occupée jusqu'à ${freeAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })}`;
-              } else {
-                statusText = "Occupée";
-              }
-            }
+        let statusText = "";
+        if (isFree) {
+          const freeData = data as FreeData;
+          if (freeData.nextCourse) {
+            statusText = `Libre jusqu'à ${formatTimeFromDate(toDate(freeData.nextCourse.dtstart))}`;
+          } else {
+            statusText = "Libre toute la journée";
+          }
+        } else {
+          const usedData = data as UsedData;
+          if (usedData.willBeFree) {
+            const freeAt = new Date(usedData.willBeFree);
+            statusText = `Occupée jusqu'à ${freeAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })}`;
+          } else {
+            statusText = "Occupée";
+          }
+        }
 
-            return (
-              <TableRow
-                key={roomName}
+        return (
+          <button
+            key={roomName}
+            type="button"
+            onClick={() => onRoomClick(roomName)}
+            className="group flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-accent/50 first:rounded-t-lg last:rounded-b-lg"
+          >
+            <div className="flex items-center gap-3">
+              <span
                 className={cn(
-                  "cursor-pointer",
-                  isFree ? "bg-green-50/50 hover:bg-green-100/50" : "bg-red-50/50 hover:bg-red-100/50"
+                  "h-2.5 w-2.5 rounded-full shrink-0",
+                  isFree ? "bg-emerald-500" : "bg-rose-500"
                 )}
-                onClick={() => onRoomClick(roomName)}
-              >
-                <TableCell className="text-base font-medium">{roomName}</TableCell>
-                <TableCell className="text-base text-right text-muted-foreground">
-                  {statusText}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+              />
+              <span className="text-base font-medium">{roomName}</span>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {statusText}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,12 +1,4 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export function RoomSkeleton() {
   return (
@@ -51,27 +43,19 @@ export function RoomSkeletonGrid() {
 
 export function RoomSkeletonTable() {
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-base">Salle</TableHead>
-            <TableHead className="text-base text-right">Prochain événement</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell>
-                <Skeleton className="h-6 w-24" />
-              </TableCell>
-              <TableCell className="text-right">
-                <Skeleton className="h-6 w-40 ml-auto" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="divide-y divide-border rounded-lg border bg-card">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-2.5 w-2.5 rounded-full" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <Skeleton className="h-4 w-36" />
+        </div>
+      ))}
     </div>
   );
 }
