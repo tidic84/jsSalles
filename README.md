@@ -14,6 +14,8 @@ Application web pour consulter la disponibilité des salles de l'Université d'A
 - 🔐 **Panneau d'administration** - Gestion des salles et statistiques de visites
 - 📊 **Statistiques** - Suivi des visites journalières
 - 🗺️ **Multi-campus** - Support de plusieurs sites (CERI, Agroscience, Avignon-Centre)
+- 🔄 **Rafraîchissement automatique** - Les disponibilités se mettent à jour toutes les 5 minutes et au retour sur l'onglet
+- 📲 **PWA** - Installable sur l'écran d'accueil, avec cache hors-ligne de secours
 
 ## 🚀 Stack Technique
 
@@ -66,7 +68,8 @@ DB_NAME=jssalles
 DB_PASSWORD=votre_mot_de_passe
 DB_PORT=5432
 
-# Session (générer une clé sécurisée)
+# Session (obligatoire, 32 caractères minimum)
+# Générer avec : openssl rand -hex 32
 SESSION_SECRET=votre_cle_secrete_de_32_caracteres_min
 ```
 
@@ -100,6 +103,10 @@ jssalles/
 │   └── lib/                 # Utilitaires
 │       ├── db.ts           # Connexion PostgreSQL
 │       ├── queries.ts      # Requêtes SQL
+│       ├── ical-parser.ts  # Parsing des calendriers ICS (node-ical)
+│       ├── timezone.ts     # Conversions heure de Paris <-> UTC
+│       ├── session.ts      # Configuration iron-session
+│       ├── rate-limit.ts   # Limitation des tentatives de connexion
 │       └── room-utils.ts   # Logique métier des salles
 ├── db/                      # Scripts SQL
 │   ├── init.sql            # Schéma de la BDD
@@ -126,10 +133,10 @@ INSERT INTO rooms (univ, room_name, room_url) VALUES
 
 ### Créer un compte administrateur
 
-1. Générer un hash du mot de passe via l'endpoint :
+1. Générer un hash du mot de passe :
 
 ```bash
-curl http://localhost:3000/api/admin/hash?password=votre_mot_de_passe
+npm run hash-password -- votre_mot_de_passe
 ```
 
 2. Insérer l'utilisateur en base :
@@ -144,6 +151,14 @@ VALUES ('admin', 'hash_généré');
 - Gestion des salles (ajout, modification, suppression)
 - Vérification des URLs de calendriers
 - Statistiques de visites journalières
+
+## 🧪 Tests
+
+```bash
+npm test
+```
+
+Les tests (Vitest) couvrent le parsing des calendriers ICS (line folding, récurrences RRULE), les conversions de fuseau horaire et la logique de disponibilité des salles.
 
 ## 🚀 Déploiement
 

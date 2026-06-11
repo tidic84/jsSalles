@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "hash-password": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -17,6 +19,7 @@
     "iron-session": "^8.0.4",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
+    "node-ical": "^0.26.1",
     "pg": "^8.18.0",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
@@ -34,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }

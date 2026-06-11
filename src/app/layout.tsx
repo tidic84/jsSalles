@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
+import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
 
 const inter = Inter({
@@ -23,6 +24,15 @@ export const metadata: Metadata = {
     siteName: "Salles libres - Universite d'Avignon",
     type: "website",
   },
+  appleWebApp: {
+    capable: true,
+    title: "jsSalles",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
 };
 
 export default function RootLayout({
@@ -61,6 +71,7 @@ export default function RootLayout({
           />
         </noscript>
         {children}
+        <PwaRegister />
       </body>
     </html>
   );

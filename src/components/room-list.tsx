@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils";
 
 interface Course {
-  dtstart: string;
-  dtend: string;
+  start: string;
+  end: string;
   summary: string;
   location: string;
   description: string;
@@ -13,6 +13,7 @@ interface Course {
 interface FreeData {
   free: true;
   nextCourse: Course | null;
+  courses: Course[];
 }
 
 interface UsedData {
@@ -21,18 +22,8 @@ interface UsedData {
   willBeFree: string | null;
 }
 
-function toDate(dt: string): Date {
-  const year = parseInt(dt.substring(0, 4));
-  const month = parseInt(dt.substring(4, 6)) - 1;
-  const day = parseInt(dt.substring(6, 8));
-  const hour = parseInt(dt.substring(9, 11));
-  const minute = parseInt(dt.substring(11, 13));
-  const second = parseInt(dt.substring(13, 15));
-  return new Date(Date.UTC(year, month, day, hour, minute, second));
-}
-
-function formatTimeFromDate(d: Date) {
-  return d.toLocaleTimeString("fr-FR", {
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -61,15 +52,14 @@ export function RoomList({ rooms, onRoomClick }: RoomListProps) {
         if (isFree) {
           const freeData = data as FreeData;
           if (freeData.nextCourse) {
-            statusText = `Libre jusqu'à ${formatTimeFromDate(toDate(freeData.nextCourse.dtstart))}`;
+            statusText = `Libre jusqu'à ${formatTime(freeData.nextCourse.start)}`;
           } else {
             statusText = "Libre toute la journée";
           }
         } else {
           const usedData = data as UsedData;
           if (usedData.willBeFree) {
-            const freeAt = new Date(usedData.willBeFree);
-            statusText = `Occupée jusqu'à ${freeAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Paris" })}`;
+            statusText = `Occupée jusqu'à ${formatTime(usedData.willBeFree)}`;
           } else {
             statusText = "Occupée";
           }

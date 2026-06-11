@@ -1,9 +1,11 @@
-import { Course, getClassCourses, toDate } from "./ical-parser";
+import { Course, getClassCourses } from "./ical-parser";
 import { getRooms } from "./queries";
+import { parisDayBounds, parisTimeToUtc } from "./timezone";
 
 interface FreeResult {
   free: true;
   nextCourse: Course | null;
+  courses: Course[];
 }
 
 interface UsedResult {
@@ -20,19 +22,17 @@ export interface RoomResult {
   invalidRooms: Record<string, string>;
 }
 
-function isClassFree(courses: Course[], now: Date): ClassStatus {
+export function isClassFree(courses: Course[], now: Date): ClassStatus {
   if (courses.length === 0) {
-    return { free: true, nextCourse: null };
+    return { free: true, nextCourse: null, courses };
   }
 
   let nextCourse: Course | null = null;
   let nextCourseDiff: number | null = null;
 
   for (const course of courses) {
-    if (!course?.dtstart || !course?.dtend) continue;
-
-    const courseStart = toDate(course.dtstart);
-    const courseEnd = toDate(course.dtend);
+    const courseStart = new Date(course.start);
+    const courseEnd = new Date(course.end);
 
     if (courseStart <= now && courseEnd > now) {
       return {
@@ -51,16 +51,15 @@ function isClassFree(courses: Course[], now: Date): ClassStatus {
     }
   }
 
-  return { free: true, nextCourse };
+  return { free: true, nextCourse, courses };
 }
 
-function whenWillItBeFree(courses: Course[], now: Date): Date | null {
+export function whenWillItBeFree(courses: Course[], now: Date): Date | null {
   let currentEnd: Date | null = null;
 
   for (const course of courses) {
-    if (!course?.dtstart || !course?.dtend) continue;
-    const start = toDate(course.dtstart);
-    const end = toDate(course.dtend);
+    const start = new Date(course.start);
+    const end = new Date(course.end);
     if (start <= now && end > now) {
       if (currentEnd === null || end > currentEnd) {
         currentEnd = end;
@@ -74,9 +73,8 @@ function whenWillItBeFree(courses: Course[], now: Date): Date | null {
   while (extended) {
     extended = false;
     for (const course of courses) {
-      if (!course?.dtstart || !course?.dtend) continue;
-      const start = toDate(course.dtstart);
-      const end = toDate(course.dtend);
+      const start = new Date(course.start);
+      const end = new Date(course.end);
       if (start <= currentEnd && end > currentEnd) {
         currentEnd = end;
         extended = true;
@@ -94,14 +92,10 @@ export async function getFreeRooms(
 ): Promise<RoomResult> {
   const rooms = await getRooms(univ);
 
-  let date: Date;
-  if (queryDate && queryTime) {
-    const [hours, minutes] = queryTime.split(":").map(Number);
-    date = new Date(queryDate);
-    date.setUTCHours(hours, minutes, 0, 0);
-  } else {
-    date = new Date();
-  }
+  // La date/heure fournie est interprétée en heure de Paris.
+  const date =
+    queryDate && queryTime ? parisTimeToUtc(queryDate, queryTime) : new Date();
+  const { dayStart, dayEnd } = parisDayBounds(date);
 
   const freeRooms: Record<string, FreeResult> = {};
   const usedRooms: Record<string, UsedResult> = {};
@@ -114,7 +108,7 @@ export async function getFreeRooms(
         return;
       }
       try {
-        const courses = await getClassCourses(room.room_url, date);
+        const courses = await getClassCourses(room.room_url, dayStart, dayEnd);
         const status = isClassFree(courses, date);
         if (status.free) {
           freeRooms[room.room_name] = status;
