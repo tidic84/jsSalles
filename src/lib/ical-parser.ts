@@ -1,6 +1,8 @@
+import ical, { type CalendarResponse, type VEvent } from "node-ical";
+
 export interface Course {
-  dtstart: string;
-  dtend: string;
+  start: string; // ISO 8601
+  end: string; // ISO 8601
   summary: string;
   location: string;
   description: string;
@@ -8,66 +10,112 @@ export interface Course {
 
 const cache = new Map<string, { data: Course[]; expiry: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 500;
 
-function toDate(dt: string): Date {
-  const year = parseInt(dt.substring(0, 4));
-  const month = parseInt(dt.substring(4, 6)) - 1;
-  const day = parseInt(dt.substring(6, 8));
-  const hour = parseInt(dt.substring(9, 11));
-  const minute = parseInt(dt.substring(11, 13));
-  const second = parseInt(dt.substring(13, 15));
-  return new Date(Date.UTC(year, month, day, hour, minute, second));
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "val" in value) {
+    return String((value as { val: unknown }).val);
+  }
+  return "";
 }
 
-function parseIcal(data: string, targetDate: Date): Course[] {
-  const eventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
+function toCourse(event: VEvent, start: Date, end: Date): Course {
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    summary: asText(event.summary) || "Non specifie",
+    location: asText(event.location) || "Non specifie",
+    description: asText(event.description) || "Non specifie",
+  };
+}
+
+/**
+ * Extrait les cours d'un calendrier iCal qui chevauchent la fenêtre
+ * [dayStart, dayEnd), en expansant les règles de récurrence (RRULE).
+ */
+export function coursesInWindow(
+  data: CalendarResponse,
+  dayStart: Date,
+  dayEnd: Date
+): Course[] {
   const courses: Course[] = [];
-  let match;
 
-  const targetDay = targetDate.getUTCDate();
-  const targetMonth = targetDate.getUTCMonth();
-  const targetYear = targetDate.getUTCFullYear();
+  const pushIfOverlap = (event: VEvent, start: Date, end: Date) => {
+    if (start < dayEnd && end > dayStart) {
+      courses.push(toCourse(event, start, end));
+    }
+  };
 
-  while ((match = eventRegex.exec(data)) !== null) {
-    const block = match[1];
+  for (const component of Object.values(data)) {
+    if (component?.type !== "VEVENT") continue;
+    const event = component as VEvent;
+    if (!event.start || !event.end) continue;
 
-    const dtstartMatch = block.match(/DTSTART(?:;VALUE=DATE)?:([^\r\n]*)/);
-    const dtendMatch = block.match(/DTEND(?:;VALUE=DATE)?:([^\r\n]*)/);
-    const summaryMatch = block.match(/SUMMARY;LANGUAGE=fr:([^\r\n]*)/);
-    const locationMatch = block.match(/LOCATION;LANGUAGE=fr:([^\r\n]*)/);
-    const descriptionMatch = block.match(/DESCRIPTION;LANGUAGE=fr:([^\r\n]*)/);
+    if (event.rrule) {
+      const duration = event.end.getTime() - event.start.getTime();
+      const exdates = event.exdate
+        ? Object.values(event.exdate).map((d) => new Date(d).getTime())
+        : [];
+      const overrides = event.recurrences
+        ? (Object.values(event.recurrences) as VEvent[])
+        : [];
+      const overriddenIds = overrides.map((r) =>
+        r.recurrenceid ? new Date(r.recurrenceid as Date).getTime() : NaN
+      );
 
-    const dtstart = dtstartMatch?.[1]?.trim();
-    const dtend = dtendMatch?.[1]?.trim();
-    const summary = summaryMatch?.[1]?.trim();
+      const occurrences = event.rrule.between(
+        new Date(dayStart.getTime() - duration),
+        dayEnd,
+        true
+      );
+      for (const occStart of occurrences) {
+        const t = occStart.getTime();
+        if (exdates.includes(t) || overriddenIds.includes(t)) continue;
+        pushIfOverlap(event, occStart, new Date(t + duration));
+      }
 
-    if (!dtstart || !dtend || !summary) continue;
-
-    const eventDate = toDate(dtstart);
-    if (
-      eventDate.getUTCDate() === targetDay &&
-      eventDate.getUTCMonth() === targetMonth &&
-      eventDate.getUTCFullYear() === targetYear
-    ) {
-      courses.push({
-        dtstart,
-        dtend,
-        summary,
-        location: locationMatch?.[1]?.trim() || "Non specifie",
-        description: descriptionMatch?.[1]?.trim() || "Non specifie",
-      });
+      for (const override of overrides) {
+        if (override.start && override.end) {
+          pushIfOverlap(override, override.start, override.end);
+        }
+      }
+    } else {
+      pushIfOverlap(event, event.start, event.end);
     }
   }
 
   return courses;
 }
 
+export function parseCourses(
+  icsText: string,
+  dayStart: Date,
+  dayEnd: Date
+): Course[] {
+  return coursesInWindow(ical.sync.parseICS(icsText), dayStart, dayEnd);
+}
+
+function evictExpired() {
+  if (cache.size < CACHE_MAX_ENTRIES) return;
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (entry.expiry <= now) cache.delete(key);
+  }
+}
+
+/**
+ * Récupère les cours d'une salle pour la fenêtre donnée.
+ * Lève une erreur si le calendrier est inaccessible ou invalide,
+ * afin que l'appelant puisse marquer la salle comme invalide
+ * plutôt que de l'afficher libre à tort.
+ */
 export async function getClassCourses(
   url: string,
-  date: Date
+  dayStart: Date,
+  dayEnd: Date
 ): Promise<Course[]> {
-  const dateStr = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
-  const cacheKey = `${url}:${dateStr}`;
+  const cacheKey = `${url}:${dayStart.toISOString()}`;
 
   const cached = cache.get(cacheKey);
   if (cached && cached.expiry > Date.now()) {
@@ -79,17 +127,17 @@ export async function getClassCourses(
 
   try {
     const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Calendrier inaccessible (HTTP ${response.status})`);
+    }
     const text = await response.text();
-    const courses = parseIcal(text, date);
+    const courses = parseCourses(text, dayStart, dayEnd);
 
+    evictExpired();
     cache.set(cacheKey, { data: courses, expiry: Date.now() + CACHE_TTL });
 
     return courses;
-  } catch {
-    return [];
   } finally {
     clearTimeout(timeout);
   }
 }
-
-export { toDate };

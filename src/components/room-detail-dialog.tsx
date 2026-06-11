@@ -10,21 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface Course {
-  dtstart: string;
-  dtend: string;
+  start: string;
+  end: string;
   summary: string;
   location: string;
   description: string;
-}
-
-function toDate(dt: string): Date {
-  const year = parseInt(dt.substring(0, 4));
-  const month = parseInt(dt.substring(4, 6)) - 1;
-  const day = parseInt(dt.substring(6, 8));
-  const hour = parseInt(dt.substring(9, 11));
-  const minute = parseInt(dt.substring(11, 13));
-  const second = parseInt(dt.substring(13, 15));
-  return new Date(Date.UTC(year, month, day, hour, minute, second));
 }
 
 function formatTime(d: Date) {
@@ -54,7 +44,7 @@ export function RoomDetailDialog({
   now,
 }: RoomDetailDialogProps) {
   const sorted = [...courses].sort(
-    (a, b) => toDate(a.dtstart).getTime() - toDate(b.dtstart).getTime()
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
   );
 
   return (
@@ -80,8 +70,8 @@ export function RoomDetailDialog({
             </p>
             <div className="relative ml-3 border-l-2 border-muted pl-4">
               {sorted.map((course, i) => {
-                const start = toDate(course.dtstart);
-                const end = toDate(course.dtend);
+                const start = new Date(course.start);
+                const end = new Date(course.end);
                 const isCurrent = start <= now && end > now;
                 const isPast = end <= now;
 

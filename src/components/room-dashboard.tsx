@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -14,8 +14,8 @@ import { RoomSkeletonTable } from "@/components/room-skeleton";
 import { CalendarClock, RotateCw } from "lucide-react";
 
 interface Course {
-  dtstart: string;
-  dtend: string;
+  start: string;
+  end: string;
   summary: string;
   location: string;
   description: string;
@@ -24,6 +24,7 @@ interface Course {
 interface FreeData {
   free: true;
   nextCourse: Course | null;
+  courses: Course[];
 }
 
 interface UsedData {
@@ -38,6 +39,8 @@ interface RoomResult {
   invalidRooms: Record<string, string>;
 }
 
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 export function RoomDashboard({ univ }: { univ: string }) {
   const [data, setData] = useState<RoomResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,10 +50,14 @@ export function RoomDashboard({ univ }: { univ: string }) {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [queryDate, setQueryDate] = useState<string | null>(null);
   const [queryTime, setQueryTime] = useState<string | null>(null);
+  const queryRef = useRef<{ date: string | null; time: string | null }>({
+    date: null,
+    time: null,
+  });
 
   const fetchRooms = useCallback(
-    async (d?: string | null, t?: string | null) => {
-      setLoading(true);
+    async (d?: string | null, t?: string | null, silent = false) => {
+      if (!silent) setLoading(true);
       try {
         const params = new URLSearchParams();
         if (d && t) {
@@ -62,9 +69,9 @@ export function RoomDashboard({ univ }: { univ: string }) {
         const json = await res.json();
         setData(json);
       } catch {
-        setData(null);
+        if (!silent) setData(null);
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     },
     [univ]
@@ -73,16 +80,34 @@ export function RoomDashboard({ univ }: { univ: string }) {
   useEffect(() => {
     const now = new Date();
     setDate(now.toISOString().split("T")[0]);
-    setTime(
-      now.toTimeString().split(" ")[0].slice(0, 5)
-    );
+    setTime(now.toTimeString().split(" ")[0].slice(0, 5));
     fetchRooms();
+  }, [fetchRooms]);
+
+  // Rafraîchissement automatique en mode "maintenant" : toutes les 5 minutes
+  // et au retour sur l'onglet (utile sur mobile).
+  useEffect(() => {
+    const refreshIfLive = () => {
+      if (queryRef.current.date === null) {
+        fetchRooms(null, null, true);
+      }
+    };
+    const interval = setInterval(refreshIfLive, REFRESH_INTERVAL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshIfLive();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [fetchRooms]);
 
   function handleSearch() {
     setPickerOpen(false);
     setQueryDate(date);
     setQueryTime(time);
+    queryRef.current = { date, time };
     fetchRooms(date, time);
   }
 
@@ -92,6 +117,7 @@ export function RoomDashboard({ univ }: { univ: string }) {
     setTime(now.toTimeString().split(" ")[0].slice(0, 5));
     setQueryDate(null);
     setQueryTime(null);
+    queryRef.current = { date: null, time: null };
     fetchRooms();
   }
 
@@ -100,11 +126,9 @@ export function RoomDashboard({ univ }: { univ: string }) {
     : [];
   const usedEntries = data
     ? Object.entries(data.usedRooms).sort(([a], [b]) => {
-        const aTime = a;
-        const bTime = b;
-        const aFree = data.usedRooms[aTime]?.willBeFree;
-        const bFree = data.usedRooms[bTime]?.willBeFree;
-        if (!aFree && !bFree) return aTime.localeCompare(bTime);
+        const aFree = data.usedRooms[a]?.willBeFree;
+        const bFree = data.usedRooms[b]?.willBeFree;
+        if (!aFree && !bFree) return a.localeCompare(b);
         if (!aFree) return 1;
         if (!bFree) return -1;
         return new Date(aFree).getTime() - new Date(bFree).getTime();
@@ -119,17 +143,13 @@ export function RoomDashboard({ univ }: { univ: string }) {
     ? !!data?.freeRooms[selectedRoom]
     : false;
 
-  const selectedCourses: Course[] = selectedRoomData
-    ? selectedRoomData.free
-      ? selectedRoomData.nextCourse
-        ? [selectedRoomData.nextCourse]
-        : []
-      : (selectedRoomData as UsedData).courses || []
-    : [];
+  const selectedCourses: Course[] = selectedRoomData?.courses || [];
 
+  // Instant de référence pour le planning ; la date/heure choisie est
+  // interprétée dans le fuseau du navigateur (Paris pour nos utilisateurs).
   const now =
     queryDate && queryTime
-      ? new Date(`${queryDate}T${queryTime}:00Z`)
+      ? new Date(`${queryDate}T${queryTime}:00`)
       : new Date();
 
   return (
